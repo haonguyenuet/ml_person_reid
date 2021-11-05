@@ -5,7 +5,6 @@ from PIL import Image
 
 import urllib
 
-import time
 import sys
 import warnings
 import errno
@@ -52,11 +51,6 @@ def download_url(url, dst):
     print('* destination="{}"'.format(dst))
 
     def _reporthook(count, block_size, total_size):
-        start_time = 0
-        if count == 0:
-            start_time = time.time()
-            return
-        duration = time.time() - start_time
         progress_size = int(count * block_size)
         percent = int(progress_size * 100 / total_size)
         sys.stdout.write(

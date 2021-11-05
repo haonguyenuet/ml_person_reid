@@ -5,9 +5,7 @@ import os.path as osp
 from ..image_dataset import ImageDataset
 
 class Market1501(ImageDataset):
-    """Market1501.
-    Reference: `<http://www.liangzheng.org/Project/project_reid.html>`_
-    
+    """Market1501.  
     Dataset statistics:
         - identities: 1501 (+1 for background).
         - images: 12936 (train) + 3368 (query) + 15913 (gallery).

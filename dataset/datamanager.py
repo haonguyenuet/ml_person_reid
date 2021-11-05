@@ -1,10 +1,9 @@
 from torch.utils.data import DataLoader
 
-from dataset import init_image_dataset
-from dataset.transform import build_transforms
-
 from collections import namedtuple
 
+from dataset.image import init_image_dataset
+from dataset.transform import build_transforms
 
 QueryGallery = namedtuple('QueryGallery', ['query', 'gallery'])
 TrainTest = namedtuple('TrainTest', ['train', 'test'])

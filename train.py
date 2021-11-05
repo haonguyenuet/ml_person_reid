@@ -1,18 +1,29 @@
 import torch
-from model.osnet import OSNet
-from loss.cross_entropy_loss import CrossEntropyLoss
-from dataset.datamanager import DataManager
-
-from metrics.accuracy import accuracy
 
 import argparse
+import os
+
+import model as net
+import metrics
+from loss import CrossEntropyLoss
+from dataset.datamanager import DataManager
 
 
-def parse_data_for_train(data):
-    imgs = data['img']
-    pids = data['pid']
-    return imgs, pids
+def train_epoch(model, datamanager, epoch, print_freq, use_gpu):
+    model.train()
+    running_loss = 0.0
+    running_acc = 0.0
 
+    for batch_index, data in enumerate(datamanager.trainloader):
+        loss, acc = forward_backward(model, data, datamanager, use_gpu=use_gpu)
+
+        running_loss += loss
+        running_acc += acc
+        if (batch_index + 1) % print_freq == 0:
+            print('[%d, %5d]\t loss: %.3f\t accuracy: %.3f'
+                  % (epoch + 1, batch_index + 1, running_loss / print_freq, running_acc / print_freq))
+            running_loss = 0.0
+            running_acc = 0.0
 
 def forward_backward(model, data, datamanager, use_gpu=True):
     imgs, pids = parse_data_for_train(data)
@@ -32,27 +43,19 @@ def forward_backward(model, data, datamanager, use_gpu=True):
     loss.backward()
     optimizer.step()
 
-    acc = accuracy(outputs, pids)[0]
+    acc = metrics.accuracy(outputs, pids)[0]
 
     return loss.item(), acc.item()
 
+def parse_data_for_train(data):
+    imgs = data['img']
+    pids = data['pid']
+    return imgs, pids
 
-def train_epoch(model, datamanager, epoch, print_freq, use_gpu):
-    model.train()
-    running_loss = 0.0
-    running_acc = 0.0
-
-    for batch_index, data in enumerate(datamanager.trainloader):
-        loss, acc = forward_backward(model, data, datamanager, use_gpu=use_gpu)
-
-        running_loss += loss
-        running_acc += acc
-        if (batch_index + 1) % print_freq == 0:
-            print('[%d, %5d]\t loss: %.3f\t accuracy: %.3f'
-                  % (epoch + 1, batch_index + 1, running_loss / print_freq, running_acc / print_freq))
-            running_loss = 0.0
-            running_acc = 0.0
-
+def save_model(model, model_name, epoch_label):
+    save_filename = 'model_%s.pth'%epoch_label
+    save_path = os.path.join('./model', model_name, save_filename)
+    torch.save(model.cpu().state_dict(), save_path)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -87,7 +90,7 @@ if __name__ == '__main__':
         workers=args.workers,
     )
 
-    model = OSNet(num_classes=datamanager.num_train_pids)
+    model = net.OSNet(num_classes=datamanager.num_train_pids)
 
     for epoch in range(args.max_epoch):
         train_epoch(
@@ -97,4 +100,4 @@ if __name__ == '__main__':
             print_freq=args.print_freq,
             use_gpu=args.use_gpu
         )
-        torch.save(model.state_dict(), './model.pth')
+        save_model(model, 'osnet', epoch)

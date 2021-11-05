@@ -1,5 +1,5 @@
-from .image.market1501 import  Market1501
-from .image.dukemtmcreid import  DukeMTMCreID
+from .market1501 import  Market1501
+from .dukemtmcreid import  DukeMTMCreID
 
 __image_datasets = {
     'dukemtmcreid': DukeMTMCreID,

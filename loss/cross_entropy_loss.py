@@ -2,25 +2,23 @@ import torch
 import torch.nn as nn
 
 class CrossEntropyLoss(nn.Module):
-    def __init__(self, num_classes, eps=0.1, use_gpu=True, label_smooth=True):
+    def __init__(self, num_classes, eps=0.1, use_gpu=True):
         super(CrossEntropyLoss, self).__init__()
         self.num_classes = num_classes
-        self.eps = eps if label_smooth else 0
         self.use_gpu = use_gpu
         self.logsoftmax = nn.LogSoftmax(dim=1)
 
-    def forward(self, inputs, targets):
+    def forward(self, logit, y):
         """
         Args:
-            inputs (torch.Tensor): prediction matrix (before softmax) with
+            logit: prediction matrix (before softmax) with
                 shape (batch_size, num_classes).
-            targets (torch.LongTensor): ground truth labels with shape (batch_size).
+            y: ground truth labels with shape (batch_size).
                 Each position contains the label index.
         """
-        log_probs = self.logsoftmax(inputs)
+        log_probs = self.logsoftmax(logit)
         zeros = torch.zeros(log_probs.size())
-        targets = zeros.scatter_(1, targets.unsqueeze(1).data.cpu(), 1)
+        y = zeros.scatter_(1, y.unsqueeze(1).data.cpu(), 1)
         if self.use_gpu:
-            targets = targets.cuda()
-        targets = (1 - self.eps) * targets + self.eps / self.num_classes
-        return (-targets * log_probs).mean(0).sum()
+            y = y.cuda()
+        return (-y * log_probs).mean(0).sum()
