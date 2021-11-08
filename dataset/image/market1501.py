@@ -30,7 +30,7 @@ class Market1501(ImageDataset):
         required_files = [
             self.data_dir, self.train_dir, self.query_dir, self.gallery_dir
         ]
-        self.check_before_run(required_files)
+        self.check_required_dir(required_files)
 
         train = self.process_dir(self.train_dir, relabel=True)
         query = self.process_dir(self.query_dir, relabel=False)

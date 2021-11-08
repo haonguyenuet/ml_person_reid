@@ -114,7 +114,7 @@ class ImageDataset(object):
 
         print('{} dataset is ready'.format(self.__class__.__name__))
 
-    def check_before_run(self, required_files):
+    def check_required_dir(self, required_files):
         for fpath in required_files:
             if not osp.exists(fpath):
                 raise RuntimeError('"{}" is not found'.format(fpath))

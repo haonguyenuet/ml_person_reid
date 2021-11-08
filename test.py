@@ -2,11 +2,11 @@ import torch
 
 import numpy as np
 import argparse
-import os
 
-import model as nets
+import models
 import metrics
-from dataset.datamanager import DataManager
+import dataset
+
 
 def evaluate(model, query_loader=None, gallery_loader=None, use_gpu=True):
     model.eval()
@@ -41,14 +41,14 @@ def evaluate(model, query_loader=None, gallery_loader=None, use_gpu=True):
     return cmc[0], mAP
 
 
-def feature_extraction(model, loader, use_gpu):
+def feature_extraction(model, loader, use_gpu=True):
     features_, pids_, camids_ = [], [], []
     for _, data in enumerate(loader):
         imgs, pids, camids = parse_data_for_test(data)
         if use_gpu:
             imgs = imgs.cuda()
         features = model(imgs)
-        # features = features.cpu().clone()
+        features = features.cpu().clone()
         features_.append(features)
         pids_.extend(pids)
         camids_.extend(camids)
@@ -64,25 +64,22 @@ def parse_data_for_test(data):
     camids = data['camid']
     return imgs, pids, camids
 
+def load_model(model, use_gpu):
+    if use_gpu:
+       device = torch.device('cuda:0')
+       model.load_state_dict(torch.load('./pretrained_model.pth'))
+       model.to(device)
+    else:
+       device = torch.device('cpu')
+       model.load_state_dict(torch.load('./pretrained_model.pth',map_location=device))
 
-def load_model(model, model_name, epoch_label):
-    save_filename = 'model_%s.pth' % epoch_label
-    save_path = os.path.join('./model', model_name, save_filename)
-    model.load_state_dict(torch.load(save_path))
     return model
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=str, help="Path to store data")
-    parser.add_argument("--dataset_name", type=str, help="dataset name")
-    parser.add_argument("--which_epoch", type=int, help="epoch label")
-    parser.add_argument("--height", type=int, default=256,
-                        help="target image height. Default is 256")
-    parser.add_argument("--width", type=int, default=128,
-                        help="target image width. Default is 128")
-    parser.add_argument("--transforms", type=str, default='random_flip',
-                        help="transformations applied to model training. Default is random_flip")
+    parser.add_argument("--dataset_name", type=str,
+                        default="market1501", help="dataset name")
     parser.add_argument("--batch_size_test", type=int, default=32,
                         help="number of images in a testing batch. Default is 32")
     parser.add_argument("--workers", type=int, default=4,
@@ -92,18 +89,15 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    datamanager = DataManager(
+    datamanager = dataset.DataPreparer(
         root=args.root,
         dataset_name=args.dataset_name,
-        height=args.height,
-        width=args.width,
-        transforms=args.transforms,
         batch_size_test=args.batch_size_test,
         workers=args.workers,
     )
 
-    model = nets.OSNet(num_classes=datamanager.num_train_pids)
-    model = load_model(model, 'osnet', args.which_epoch)
+    model = models.OSNet(num_classes=datamanager.num_train_pids)
+    model = load_model(model, args.use_gpu)
 
     rank1, mAP = evaluate(
         model=model,
@@ -111,3 +105,5 @@ if __name__ == '__main__':
         gallery_loader=datamanager.testloader.gallery,
         use_gpu=args.use_gpu
     )
+    print("Rank 1: ", rank1)
+    print("mAP: ", mAP)

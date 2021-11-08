@@ -5,5 +5,10 @@ pip install -r requirements.txt
 
 ## Training
 ```shell
-python train.py --root "./data" --dataset_name "market1501" --max_epoch 20
+python train.py --root "./data" --max_epoch 20
+```
+
+## Testing
+```shell
+python test.py --root "./data"
 ```

@@ -2,7 +2,7 @@ from torch import nn
 from torch.nn import functional as F
 
 
-## Building Basic Layer
+# Building Basic Layer
 class Conv1x1(nn.Module):
     """ 1x1 Conv -> Batch norm -> ReLU """
 
@@ -140,7 +140,7 @@ class OSResBlock(nn.Module):
         return F.relu(out)
 
 
-### Building OSNet for Input 3 x 256 x 128 
+# Building OSNet for Input 3 x 256 x 128
 
 
 class OSNet(nn.Module):
@@ -149,32 +149,32 @@ class OSNet(nn.Module):
                  blocks=[OSResBlock, OSResBlock, OSResBlock],
                  layers=[2, 2, 2],
                  channels=[64, 256, 384, 512],
-                 feature_dim=512,
-                 loss='softmax'):
+                 fc_dim=512):
         super().__init__()
-        self.loss = loss
-
         # convolutional backbone
         self.conv1 = ConvLayer(3, channels[0], 7, stride=2, padding=3)
         self.maxpool = nn.MaxPool2d(3, stride=2, padding=1)
-        self.conv2 = self._make_layer(
-            blocks[0], layers[0], channels[0], channels[1])
+        self.conv2 = self._make_layer(blocks[0], layers[0], channels[0], channels[1])
         self.tran1 = nn.Sequential(
             Conv1x1(channels[1], channels[1]),
             nn.AvgPool2d(2, stride=2)
         )
-        self.conv3 = self._make_layer(
-            blocks[1], layers[1], channels[1], channels[2])
+        self.conv3 = self._make_layer(blocks[1], layers[1], channels[1], channels[2])
         self.tran2 = nn.Sequential(
             Conv1x1(channels[2], channels[2]),
             nn.AvgPool2d(2, stride=2)
         )
-        self.conv4 = self._make_layer(
-            blocks[2], layers[2], channels[2], channels[3])
+        self.conv4 = self._make_layer(blocks[2], layers[2], channels[2], channels[3])
         self.conv5 = Conv1x1(channels[3], channels[3])
         self.global_avgpool = nn.AdaptiveAvgPool2d(1)
-        # fully connected layer
-        self.fc = nn.Linear(feature_dim, num_classes)
+        # fully connected layer (hidden layer)
+        self.fc = nn.Sequential(
+            nn.Linear(channels[3], fc_dim),
+            nn.BatchNorm1d(fc_dim),
+            nn.ReLU(inplace=True)
+        )
+        # classifier
+        self.classifier = nn.Linear(fc_dim, num_classes)
 
     def _make_layer(self, block, num_layers, c_in, c_out):
         layers = []
@@ -199,6 +199,7 @@ class OSNet(nn.Module):
     def forward(self, x):
         x = self.featuremaps(x)
         v = self.global_avgpool(x)
-        v = v.view(v.size(0), -1)
-        y = self.fc(v)
+        v = v.view(v.size(0), -1)  # flatten
+        v = self.fc(v)
+        y = self.classifier(v)
         return y

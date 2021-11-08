@@ -4,7 +4,6 @@ import os.path as osp
 from PIL import Image
 
 import urllib
-
 import sys
 import warnings
 import errno
