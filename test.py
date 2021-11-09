@@ -5,105 +5,101 @@ import argparse
 
 import models
 import metrics
-import dataset
+from data import DataManager
 
 
-def evaluate(model, query_loader=None, gallery_loader=None, use_gpu=True):
-    model.eval()
+class Tester(object):
+    def __init__(self, model, dm, use_gpu):
+        self.model = model
+        self.test_loader = dm.test_loader()
+        self.use_gpu = use_gpu
 
-    q_features, q_pids, q_camids = feature_extraction(
-        model,
-        query_loader,
-        use_gpu
-    )
-    g_features, g_pids, g_camids = feature_extraction(
-        model,
-        gallery_loader,
-        use_gpu
-    )
+    def evaluate(self):
+        self.model.eval()
 
-    print('Computing feature distance ...')
-    print('q_features(num_q, num_pids)')
-    print('g_features(num_g, num_pids)')
-    print('dismat(num_q, num_g)')
-    distmat = metrics.cosine_distance(q_features, g_features)
-    distmat = distmat.numpy()
+        q_features, q_pids, q_camids = self.feature_extraction(
+            self.test_loader.query,
+        )
+        g_features, g_pids, g_camids = self.feature_extraction(
+            self.test_loader.gallery,
+        )
 
-    print('Computing CMC and mAP ...')
-    cmc, mAP = metrics.eval_rank(
-        distmat,
-        q_pids,
-        g_pids,
-        q_camids,
-        g_camids,
-    )
+        print('Computing feature distance ...')
+        print('q_features(num_q, num_pids)')
+        print('g_features(num_g, num_pids)')
+        print('dismat(num_q, num_g)')
+        distmat = metrics.cosine_distance(q_features, g_features)
+        distmat = distmat.numpy()
 
-    return cmc[0], mAP
+        print('Computing CMC and mAP ...')
+        cmc, mAP = metrics.eval_rank_market1501(
+            distmat,
+            q_pids,
+            g_pids,
+            q_camids,
+            g_camids,
+        )
 
+        return cmc, mAP
 
-def feature_extraction(model, loader, use_gpu=True):
-    features_, pids_, camids_ = [], [], []
-    for _, data in enumerate(loader):
-        imgs, pids, camids = parse_data_for_test(data)
-        if use_gpu:
-            imgs = imgs.cuda()
-        features = model(imgs)
-        features = features.cpu().clone()
-        features_.append(features)
-        pids_.extend(pids)
-        camids_.extend(camids)
-    features_ = torch.cat(features_, 0)
-    pids_ = np.asarray(pids_)
-    camids_ = np.asarray(camids_)
-    return features_, pids_, camids_
+    def feature_extraction(self, loader):
+        features_, pids_, camids_ = [], [], []
+        with torch.no_grad():
+            for _, data in enumerate(loader):
+                imgs, pids, camids = self.parse_data_for_test(data)
+                if self.use_gpu:
+                    imgs = imgs.cuda()
+            
+                features = self.model(imgs)
+                features_.append(features)
+                pids_.extend(pids)
+                camids_.extend(camids)
+        features_ = torch.cat(features_, 0)
+        pids_ = np.asarray(pids_)
+        camids_ = np.asarray(camids_)
+        return features_, pids_, camids_
 
+    def parse_data_for_test(self, data):
+        imgs = data['img']
+        pids = data['pid']
+        camids = data['camid']
+        return imgs, pids, camids
 
-def parse_data_for_test(data):
-    imgs = data['img']
-    pids = data['pid']
-    camids = data['camid']
-    return imgs, pids, camids
 
 def load_model(model, use_gpu):
     if use_gpu:
-       device = torch.device('cuda:0')
-       model.load_state_dict(torch.load('./pretrained_model.pth'))
-       model.to(device)
+        device = torch.device('cuda:0')
+        model.load_state_dict(torch.load('./pretrained_model.pth'))
+        model.to(device)
     else:
-       device = torch.device('cpu')
-       model.load_state_dict(torch.load('./pretrained_model.pth',map_location=device))
+        device = torch.device('cpu')
+        model.load_state_dict(torch.load(
+            './pretrained_model.pth', map_location=device))
 
     return model
 
+def print_result(cmc, mAP):
+      print("Dataset statistics:")
+      print("  ----------------------------------------")
+      print("  distance  | rank1 | rank5 | mAP")
+      print("  ----------------------------------------")
+      print("  cosine    | %.2f  | %.2f  | %.2f " %(cmc[0], cmc[4], mAP))
+      print("  ----------------------------------------")
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root", type=str, help="Path to store data")
-    parser.add_argument("--dataset_name", type=str,
-                        default="market1501", help="dataset name")
-    parser.add_argument("--batch_size_test", type=int, default=32,
-                        help="number of images in a testing batch. Default is 32")
-    parser.add_argument("--workers", type=int, default=4,
-                        help="number of workers. Default is 4")
-    parser.add_argument("--use_gpu", type=bool, default=False,
-                        help="use gpu. Default is False")
+    parser = DataManager.add_model_specific_args(parser)
+    parser.add_argument("--use_gpu", type=bool, default=False)
 
     args = parser.parse_args()
 
-    datamanager = dataset.DataPreparer(
-        root=args.root,
-        dataset_name=args.dataset_name,
-        batch_size_test=args.batch_size_test,
-        workers=args.workers,
-    )
+    dm = DataManager(args)
 
-    model = models.OSNet(num_classes=datamanager.num_train_pids)
+    model = models.OSNet(num_classes=dm.num_train_classes)
     model = load_model(model, args.use_gpu)
 
-    rank1, mAP = evaluate(
-        model=model,
-        query_loader=datamanager.testloader.query,
-        gallery_loader=datamanager.testloader.gallery,
-        use_gpu=args.use_gpu
-    )
-    print("Rank 1: ", rank1)
-    print("mAP: ", mAP)
+    tester = Tester(model, dm, args.use_gpu)
+
+    cmc, mAP = tester.evaluate()
+    print_result(cmc, mAP)

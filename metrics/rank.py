@@ -1,6 +1,6 @@
 import numpy as np
 
-def eval_rank(distmat, q_pids, g_pids, q_camids, g_camids, max_rank = 50):
+def eval_rank_market1501(distmat, q_pids, g_pids, q_camids, g_camids, max_rank = 10):
     """ For each query identity, its gallery images from the same camera view are discarded """
     num_q, num_g = distmat.shape
 
@@ -30,8 +30,7 @@ def eval_rank(distmat, q_pids, g_pids, q_camids, g_camids, max_rank = 50):
         keep = np.invert(remove)
 
         # compute cmc curve
-        raw_cmc = matches[q_idx][
-            keep] # binary vector, positions with value 1 are correct matches
+        raw_cmc = matches[q_idx][keep] 
         if not np.any(raw_cmc):
             # this condition is true when query identity does not appear in gallery
             continue
@@ -43,7 +42,6 @@ def eval_rank(distmat, q_pids, g_pids, q_camids, g_camids, max_rank = 50):
         num_valid_q += 1.
 
         # compute average precision
-        # reference: https://en.wikipedia.org/wiki/Evaluation_measures_(information_retrieval)#Average_precision
         num_rel = raw_cmc.sum()
         tmp_cmc = raw_cmc.cumsum()
         tmp_cmc = [x / (i+1.) for i, x in enumerate(tmp_cmc)]
