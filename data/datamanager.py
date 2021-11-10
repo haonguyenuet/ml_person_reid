@@ -39,13 +39,13 @@ class DataManager(object):
             query=DataLoader(
                 dataset=self.queryset,
                 batch_size=self.args.batch_size_test,
-                shuffle=True,
+                shuffle=False,
                 num_workers=self.args.workers
             ),
             gallery=DataLoader(
                 dataset=self.galleryset,
                 batch_size=self.args.batch_size_test,
-                shuffle=True,
+                shuffle=False,
                 num_workers=self.args.workers
             )
         )

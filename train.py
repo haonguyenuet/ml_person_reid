@@ -36,6 +36,7 @@ class Trainer(object):
                 running_loss = 0.0
                 running_acc = 0.0
 
+                
     def forward_backward(self, data):
         imgs, pids = self.parse_data_for_train(data)
 
